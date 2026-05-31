@@ -22,3 +22,16 @@ g++ main.cpp -o escape
 
 2. Para ejecutar:
 ./escape
+
+####### Estructura del Código y Modularización.
+
+Para mantener el proyecto organizado, legible y facilitar el trabajo colaborativo, el código se dividió en módulos específicos:
+
+* **`utilidades.h`:** Funciona como nuestra biblioteca personalizada de herramientas de consola y formateo visual. Aquí se abstraen todas las funciones repetitivas para no ensuciar la lógica del juego.
+* Incluye:
+  * Control de consola: `limpiarPantalla()`, `pausa()`, `vaciarBuffer()` (vital para evitar bugs entre ingresos de números y texto).
+  * Interfaz gráfica (ASCII): Funciones paramétricas como `lineaHorizontal()`, `centrarTexto()`, `bordeSuperior()` y `bordeInferior()`, que garantizan un diseño uniforme en todas las pantallas.
+
+* **`juego.h`:** Archivo de cabecera (header) destinado a aislar las declaraciones, prototipos de las funciones principales y variables globales del estado del jugador, separando el "qué hace" del "cómo lo hace".
+
+* **`main.cpp`:** Es el núcleo lógico del programa. Contiene el punto de entrada (`main()`), el gestor del menú principal y el bucle central de la partida (`jugar()`). Aquí se interconectan las utilidades gráficas con las pantallas de historia, la evaluación de los 4 acertijos (`pregunta1()`, etc.) y el sistema de condiciones de victoria o derrota.
