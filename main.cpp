@@ -197,12 +197,53 @@ void cuentaRegresiva() {
 // ============================================================================
 
 bool pregunta1() {
-    limpiarPantalla(); bordeSuperior(); lineaVacia(1);
-    centrarTexto("PANTALLA 1: ..."); lineaVacia(1);
+    limpiarPantalla(); 
+    bordeSuperior(); 
+    lineaVacia(1);
+    centrarTexto("PANTALLA 1: AULA DE INFORMATICA GENERAL"); 
+    lineaVacia(1);
     
-   
+    cout << "  |          .---------------------------------------------------------------------------------------------.           |" << endl;
+    cout << "  |          |  _________________________________________________________________________________________  |           |" << endl;
+    cout << "  |          | | Tengo un inicio pero nunca un final. Si me ejecutas, el programa no avanza. ¿Que soy?   | |           |" << endl;
+    cout << "  |          | |_________________________________________________________________________________________| |           |" << endl;
+    cout << "  |          '---------------------------------------------------------------------------------------------'           |" << endl;
+    
+    lineaVacia(1);
+    centrarTexto("PROFESOR: Tengo un inicio pero nunca un final.");
+    centrarTexto("Si me ejecutas, el programa no avanza. ¿Que soy?");
+    lineaVacia(1);
+    centrarTexto("1) Bucle  |  2) Bucle infinito  |  3) Variable");
+    lineaVacia(1); 
+    bordeInferior();
+    
+    int respuesta; 
+    cout << "\n  Ingrese Opcion: "; 
+    cin >> respuesta; 
+    vaciarBuffer();
+    
+    limpiarPantalla(); 
+    bordeSuperior(); 
+    lineaVacia(3);
+    
+    if (respuesta == 2) { 
+        centrarTexto("CORRECTO!!"); 
+        centrarTexto("La puerta del aula se abre..."); 
+        puntaje += 25; 
+        lineaVacia(3); 
+        bordeInferior(); 
+        pausa(); 
+        return true; 
+    } else { 
+        centrarTexto("INCORRECTO!!!"); 
+        centrarTexto("La alarma de seguridad se activa..."); 
+        lineaVacia(3); 
+        bordeInferior(); 
+        pausa(); 
+        return false; 
+    }
 }
-
+   
 bool pregunta2() {
     limpiarPantalla(); bordeSuperior(); lineaVacia(1);
     centrarTexto("PANTALLA 2: ..."); lineaVacia(1);
