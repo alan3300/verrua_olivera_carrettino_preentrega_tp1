@@ -1,577 +1,571 @@
+/***************************************************************\
+ * EL GUARDIÁN DEL CEMENTERIO BRUTALISTA - TP2
+ * Alumnxs: Alan Verruá - Florencia Olivera - Fiorella Carrettino
+\***************************************************************/
 
-/*************************************************************************
- AVENTURA CONVERSACIONAL: "ESCAPE DE LA FACULTAD"
- Autores: Verrua, Alan; Olivera, Florencia; Carrettino, Fiorella.
- Materia: Informática General (Cat. Tirigall)
- Lic. en Artes Multimediales.
- Universidad Nacional de las Artes - Junio 2026
-
- Criterios de evaluación:
- - Uso de ciclo WHILE
- - Uso de ciclo FOR
- - Menu con SWITCH
- - Condicionales IF / ELSE
- - Variables INT, FLOAT y BOOL
- - Operadores logicos AND (&&) y OR (||)
- - Uso de cin para entrada de datos
- - Titulo del juego
- - Vuelta al menu al ganar/perder
- - Instructivo de como jugar
- - Resolucion terminal: 120x40
-*************************************************************************/
-
-#include <iostream>
+#include <ncurses.h>
 #include <string>
+#include <vector>
+#include <algorithm>
 #include <cstdlib>
-#include <unistd.h>
+#include <ctime>
+#include "Criatura.h"
 
 using namespace std;
 
+// Enumeración del menú principal.
+enum OpcionMenu { JUGAR = 0, INSTRUCTIVO, CREDITOS, SALIR, NUM_OPCIONES };
+
+// Resolución del diseño.
+const int ANCHO_DISENO = 120;
+const int ALTO_DISENO  = 40;
+// Tamano minimo para que sea jugable (chequeo de terminal).
+const int ANCHO_MIN = 120;
+const int ALTO_MIN  = 40;
+
+// Arreglo de frames ASCII de la criatura, indexado por EstadoAnimo.
+const string FRAMES_CRIATURA[NUM_ESTADOS][7] = {
+  { // TRANQUILO
+    "        _,=~~~==,,_       ",
+    "    ,-~~~      ~~-~,      ",
+    "   /  @         @  \\     ",
+    "  |                |      ",
+    "   \\   \\______/   /      ",
+    "    ~-__________-~        ",
+    "      ||      ||          "
+  },
+  { // INQUIETO
+    "        _,=~~~==,,_       ",
+    "    ,-~~~      ~~-~,      ",
+    "   /  @         o  \\     ",
+    "  |        __        |    ",
+    "   \\   \\______/   /      ",
+    "    ~-__________-~        ",
+    "     /|      |\\         "
+  },
+  { // FURIOSO
+    "        _,=~~~==,,_       ",
+    "    ,-~~~      ~~-~,      ",
+    "   /  \\X/   \\X/  \\    ",
+    "  |    ________     |     ",
+    "   \\  /______/\\  /      ",
+    "    ~-__________-~        ",
+    "     /|      |\\         "
+  },
+  { // SOMBRÍO
+    "        _,=~~~==,,_       ",
+    "    ,-~~~      ~~-~,      ",
+    "   /  -         -  \\     ",
+    "  |     ~~~~~~      |     ",
+    "   \\   \\______/   /      ",
+    "    ~-__________-~        ",
+    "      ||      ||          "
+  }
+};
+
+// Variables globales de adaptación a la terminal.
+int W = ANCHO_DISENO;   // ancho util real
+int H = ALTO_DISENO;    // alto util real
+int ox = 0;             // desplazamiento horizontal (centrado)
+int oy = 0;             // desplazamiento vertical (centrado)
+
+// Funciones auxiliares.
+void iniciarNcurses();
+void calcularAdaptacion();
+bool terminalSuficiente();
+void pedirTerminalGrande();
+void dibujarMarco(int colorPar);
+void barra(int y, int x, int valor, string etiqueta, int colorPar);
+void mostrarTitulo();
+void mostrarInstructivo();
+void mostrarCreditos();
+int  menuPrincipal();
+void jugar();
+void pausar(string mensaje);
+
+/* /////////////////////////////////////////////////////////////////////// */
 int main()
 {
-  // ==========================================================================
-  //  VARIABLES GLOBALES DEL JUEGO (dentro de main, como en los ejemplos)
-  // ==========================================================================
-  string nombreJugador;
-  int puntaje = 0;
-  bool juegoActivo = false;
-  float tiempoRestante = 60.0f;
-  
-  bool salirDelJuego = false;
-  int opcionMenu;
-  int eleccion;
-  bool gameover;
-  char respuesta;
-  int pantallaActual;
-  bool sigueVivo;
-  int i;
-  float porcentaje;
-  bool preparado;
+  // Semilla para la aleatoriedad con RANDOM.
+  srand((unsigned)time(NULL));
 
-  // ==========================================================================
-  //  MENU PRINCIPAL - BUCLE WHILE
-  // ==========================================================================
-  while (!salirDelJuego)
+  iniciarNcurses();
+
+  bool salir = false;
+  while (!salir)
   {
-    do
-    {
-      system("clear");
-      
-      // Titulo ASCII art
-      cout << endl << endl;
-      cout << "   ______  _____  _____       _____   ______   _____  ______   _               " << endl;
-      cout << "  |  ____|/ ____|/ ____|  /\  |  __ \ |  ____| |  __ \|  ____| | |        /\   " << endl;
-      cout << "  | |__  | (___ | |      /  \ | |__) || |__    | |  | | |__    | |       /  \  " << endl;
-      cout << "  |  __|  \___ \| |     / /\ \|  ___/ |  __|   | |  | |  __|   | |      / /\ \ " << endl;
-      cout << "  | |____ ____) | |____/ ____ \ |     | |____  | |__| | |____  | |____ / ____ \\" << endl;
-      cout << "  |______|_____/ \_____/_/    \_\     |______| |_____/|______| |______/_/    \_\\" << endl;
-      cout << endl;
-      cout << "   ______       _____  _    _  _    _______       _____  " << endl;
-      cout << "  |  ____|/\   |  __ \| |  | || |  |__   __|/\   |  __ \ " << endl;
-      cout << "  | |__  /  \  | |  | | |  | || |     | |  /  \  | |  | |" << endl;
-      cout << "  |  __|/ /\ \ | |  | | |  | || |     | | / /\ \ | |  | |" << endl;
-      cout << "  | |  / ____ \| |__| | |__| || |____ | |/ ____ \| |__| |" << endl;
-      cout << "  |_| /_/    \_\_____/ \____/ |______||_/_/    \_\_____/ " << endl;
-      cout << endl << endl;
-      
-      cout << "                                    +----------------------------------------+" << endl;
-      cout << "                                    |         MENU PRINCIPAL                 |" << endl;
-      cout << "                                    +----------------------------------------+" << endl;
-      cout << "                                    |                                        |" << endl;
-      cout << "                                    |     1- Iniciar juego                   |" << endl;
-      cout << "                                    |     2- Instrucciones                   |" << endl;
-      cout << "                                    |     3- Creditos                        |" << endl;
-      cout << "                                    |     4- Salir                           |" << endl;
-      cout << "                                    |                                        |" << endl;
-      cout << "                                    +----------------------------------------+" << endl;
-      cout << endl;
-      cout << "                                    Ingrese Opcion: ";
-      cin >> opcionMenu;
+    // Chequeo obligatorio de la consigna: la terminal debe medir
+    // al menos 120x40; si no, se muestra un mensaje y se espera.
+    pedirTerminalGrande();
 
-      // SWITCH para manejar las opciones del menu
-      switch (opcionMenu)
-      {
-        case 1:
-          system("clear");
-          cout << "El juego esta por comenzar..." << endl;
-          cin.ignore().get();
-          break;
-        case 2:
-          system("clear");
-          cout << "Mostrando instrucciones..." << endl;
-          cin.ignore().get();
-          break;
-        case 3:
-          system("clear");
-          cout << "Mostrando creditos..." << endl;
-          cin.ignore().get();
-          break;
-        case 4:
-          system("clear");
-          cout << "Ha decidido salir del juego..." << endl;
-          cin.ignore().get();
-          break;
-        default:
-          system("clear");
-          cout << "Introduzca una opcion valida." << endl;
-          cin.ignore().get();
-          break;
-      }
-    } while (opcionMenu != 1 && opcionMenu != 2 && opcionMenu != 3 && opcionMenu != 4);
+    int op = menuPrincipal();
+    if (op == JUGAR)             jugar();
+    else if (op == INSTRUCTIVO)  mostrarInstructivo();
+    else if (op == CREDITOS)     mostrarCreditos();
+    else                         salir = true;
+  }
 
-    // ==========================================================================
-    //  INSTRUCCIONES
-    // ==========================================================================
-    if (opcionMenu == 2)
-    {
-      system("clear");
-      cout << "+====================================================================================================+" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|                              INSTRUCCIONES DE JUEGO                                                |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|   Sos une estudiantx atrapadx en la UNA despues de hora.                                           |" << endl;
-      cout << "|   Debes escapar resolviendo acertijos en cada aula.                                                |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|   COMO JUGAR:                                                                                      |" << endl;
-      cout << "|   - Ingresa el numero de la opcion elegida                                                         |" << endl;
-      cout << "|   - Responde correctamente para avanzar y desbloquear las puertas                                  |" << endl;
-      cout << "|   - Si fallas una pregunta, perdes el juego                                                        |" << endl;
-      cout << "|   - Debes responder TODAS correctamente para poder escapar                                         |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "+====================================================================================================+" << endl;
-      cout << endl;
-      cout << "Presione ENTER para volver al menu...";
-      cin.ignore().get();
-    }
-
-    // ==========================================================================
-    //  CREDITOS
-    // ==========================================================================
-    else if (opcionMenu == 3)
-    {
-      system("clear");
-      cout << "+====================================================================================================+" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|                                   CREDITOS                                                         |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|   Desarrollado por: Alan Verrua, Florencia Olivera y Fiorella Carrettino                           |" << endl;
-      cout << "|   Materia: Informatica General (Cat. Tirigall)                                                     |" << endl;
-      cout << "|   Universidad Nacional de las Artes                                                                |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|   Junio de 2026                                                                                    |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "+====================================================================================================+" << endl;
-      cout << endl;
-      cout << "Presione ENTER para volver al menu...";
-      cin.ignore().get();
-    }
-
-    // ==========================================================================
-    //  JUGAR
-    // ==========================================================================
-    else if (opcionMenu == 1)
-    {
-      puntaje = 0;
-      juegoActivo = true;
-      tiempoRestante = 60.0f;
-      gameover = false;
-
-      // ---------------------- PANTALLA INTRODUCCION -------------------------
-      system("clear");
-      cout << "+====================================================================================================+" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|                    FACULTAD. CALLE VIAMONTE... 23:45 Hs...                                          |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|         Las luces se apagan... las puertas se cierran...                                           |" << endl;
-      cout << "|         Solo queda una salida, pero esta bloqueada por acertijos.                                  |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "+====================================================================================================+" << endl;
-      cout << endl;
-      cout << "Presione ENTER para continuar...";
-      cin.ignore().get();
-
-      // ---------------------- PEDIR NOMBRE ----------------------------------
-      system("clear");
-      cout << "+====================================================================================================+" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|                         Como es tu nombre, estudiantx?                                             |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "+====================================================================================================+" << endl;
-      cout << endl;
-      cout << "  Indique su nombre: ";
-      cin.ignore();
-      getline(cin, nombreJugador);
-      if (nombreJugador.empty())
-      {
-        nombreJugador = "Estudiantx";
-      }
-      cout << endl;
-      cout << "  Hola " << nombreJugador << ", INTENTA ESCAPAR!" << endl;
-      cout << endl;
-      cout << "Presione ENTER para continuar...";
-      cin.get();
-
-      // ---------------------- PANTALLA PREPARACION --------------------------
-      system("clear");
-      cout << "+====================================================================================================+" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|         " << nombreJugador << ", Por que te quedaste hasta tan tarde en la facultad?" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "|                              1. Me quede estudiando                                                |" << endl;
-      cout << "|                              2. Me quede dormidx                                                   |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "+====================================================================================================+" << endl;
-      cout << endl;
-      cout << "  Ingrese Opcion: ";
-      cin >> eleccion;
-
-      system("clear");
-      cout << "+====================================================================================================+" << endl;
-      cout << "|                                                                                                    |" << endl;
-      if (eleccion == 1)
-      {
-        cout << "|                    PROFE: JAJA mira que dedicadx...                                                 |" << endl;
-      }
-      else
-      {
-        cout << "|                    PROFE: Asi estamos, pais...                                                      |" << endl;
-      }
-      cout << "|                                                                                                    |" << endl;
-      cout << "|                    Estas preparadx para el desafio? (S/N):                                          |" << endl;
-      cout << "|                                                                                                    |" << endl;
-      cout << "+====================================================================================================+" << endl;
-      cout << endl;
-      cout << "  Respuesta: ";
-      cin >> respuesta;
-
-      // Uso de operador OR (||)
-      if (respuesta == 'S' || respuesta == 's')
-      {
-        preparado = true;
-      }
-      else
-      {
-        preparado = false;
-      }
-
-      if (!preparado)
-      {
-        system("clear");
-        cout << "+====================================================================================================+" << endl;
-        cout << "|                                                                                                    |" << endl;
-        cout << "|         Bueno, cuando estes listx volve!!! Te estaremos esperando muejjejej                        |" << endl;
-        cout << "|                                                                                                    |" << endl;
-        cout << "+====================================================================================================+" << endl;
-        cout << endl;
-        cout << "Presione ENTER para continuar...";
-        cin.ignore().get();
-        gameover = true;
-      }
-      else
-      {
-        // ---------------------- CUENTA REGRESIVA CON FOR ------------------
-        system("clear");
-        cout << endl << endl;
-        cout << "                              Preparate..." << endl;
-        cout << endl;
-
-        for (i = 3; i >= 1; i--)
-        {
-          cout << endl << endl;
-          if (i == 3)
-          {
-            cout << "                                   _____  " << endl;
-            cout << "                                  |___ /  " << endl;
-            cout << "                                    |_ \\  " << endl;
-            cout << "                                   ___) | " << endl;
-            cout << "                                  |____/  " << endl;
-          }
-          else if (i == 2)
-          {
-            cout << "                                    ___   " << endl;
-            cout << "                                   |__ \\  " << endl;
-            cout << "                                     / /  " << endl;
-            cout << "                                    / /_  " << endl;
-            cout << "                                   |____| " << endl;
-          }
-          else
-          {
-            cout << "                                     __   " << endl;
-            cout << "                                    /_ |  " << endl;
-            cout << "                                     | |  " << endl;
-            cout << "                                     | |  " << endl;
-            cout << "                                     |_|  " << endl;
-          }
-          usleep(800000);
-          system("clear");
-        }
-
-        // ==================================================================
-        //  BUCLE WHILE PARA LAS 4 PANTALLAS
-        // ==================================================================
-        pantallaActual = 1;
-        sigueVivo = true;
-
-        while (pantallaActual <= 4 && sigueVivo && juegoActivo)
-        {
-          // ---------------------- PANTALLA 1 ------------------------------
-          if (pantallaActual == 1)
-          {
-            do
-            {
-              system("clear");
-              cout << "+====================================================================================================+" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                    PANTALLA 1: AULA DE INFORMATICA GENERAL                                         |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|   PROFESOR: Tengo un inicio pero nunca un final.                                                   |" << endl;
-              cout << "|             Si me ejecutas, el programa no avanza. Que soy?                                        |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                              1) Bucle                                                              |" << endl;
-              cout << "|                              2) Bucle infinito                                                     |" << endl;
-              cout << "|                              3) Variable                                                           |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "+====================================================================================================+" << endl;
-              cout << endl;
-              cout << "  Ingrese Opcion: ";
-              cin >> eleccion;
-            } while (eleccion != 1 && eleccion != 2 && eleccion != 3);
-
-            system("clear");
-            cout << "+====================================================================================================+" << endl;
-            cout << "|                                                                                                    |" << endl;
-
-            if (eleccion == 2)
-            {
-              cout << "|                              CORRECTO!!                                                             |" << endl;
-              cout << "|                    La puerta del aula se abre...                                                    |" << endl;
-              puntaje += 25;
-            }
-            else
-            {
-              cout << "|                              INCORRECTO!!!                                                          |" << endl;
-              cout << "|                    La alarma de seguridad se activa...                                              |" << endl;
-              sigueVivo = false;
-            }
-            cout << "|                                                                                                    |" << endl;
-            cout << "+====================================================================================================+" << endl;
-            cout << endl;
-            cout << "Presione ENTER para continuar...";
-            cin.ignore().get();
-          }
-
-          // ---------------------- PANTALLA 2 ------------------------------
-          else if (pantallaActual == 2)
-          {
-            do
-            {
-              system("clear");
-              cout << "+====================================================================================================+" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                    PANTALLA 2: [COMPLETAR CON NARRATIVA]                                           |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|   [Agregar acertijo o pregunta aqui]                                                               |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                              1) Opcion 1                                                           |" << endl;
-              cout << "|                              2) Opcion 2                                                           |" << endl;
-              cout << "|                              3) Opcion 3                                                           |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|   [Usar variable float tiempoRestante y operador && o ||]                                          |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "+====================================================================================================+" << endl;
-              cout << endl;
-              cout << "  Ingrese Opcion: ";
-              cin >> eleccion;
-            } while (eleccion != 1 && eleccion != 2 && eleccion != 3);
-
-            // Ejemplo de uso de float y operador &&:
-            // tiempoRestante -= 15.0f;
-            // if (eleccion == 2 && tiempoRestante > 0.0f) { ... }
-
-            system("clear");
-            cout << "+====================================================================================================+" << endl;
-            cout << "|                                                                                                    |" << endl;
-            cout << "|                    [COMPLETAR: mensaje de correcto o incorrecto]                                    |" << endl;
-            cout << "|                                                                                                    |" << endl;
-            cout << "+====================================================================================================+" << endl;
-            cout << endl;
-            cout << "Presione ENTER para continuar...";
-            cin.ignore().get();
-            
-            // Por ahora siempre correcto para no bloquear
-            puntaje += 25;
-          }
-
-          // ---------------------- PANTALLA 3 ------------------------------
-          else if (pantallaActual == 3)
-          {
-            do
-            {
-              system("clear");
-              cout << "+====================================================================================================+" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                    PANTALLA 3: [COMPLETAR CON NARRATIVA]                                           |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|   [Agregar acertijo o pregunta aqui]                                                               |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                              1) Opcion 1                                                           |" << endl;
-              cout << "|                              2) Opcion 2                                                           |" << endl;
-              cout << "|                              3) Opcion 3                                                           |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|   [Usar variable float tiempoRestante y operador && o ||]                                          |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "+====================================================================================================+" << endl;
-              cout << endl;
-              cout << "  Ingrese Opcion: ";
-              cin >> eleccion;
-            } while (eleccion != 1 && eleccion != 2 && eleccion != 3);
-
-            // Ejemplo de uso de float y operador ||:
-            // tiempoRestante -= 15.0f;
-            // if (eleccion == 1 || tiempoRestante <= 30.0f) { ... }
-
-            system("clear");
-            cout << "+====================================================================================================+" << endl;
-            cout << "|                                                                                                    |" << endl;
-            cout << "|                    [COMPLETAR: mensaje de correcto o incorrecto]                                    |" << endl;
-            cout << "|                                                                                                    |" << endl;
-            cout << "+====================================================================================================+" << endl;
-            cout << endl;
-            cout << "Presione ENTER para continuar...";
-            cin.ignore().get();
-            
-            // Por ahora siempre correcto para no bloquear
-            puntaje += 25;
-          }
-
-          // ---------------------- PANTALLA 4 ------------------------------
-          else if (pantallaActual == 4)
-          {
-            do
-            {
-              system("clear");
-              cout << "+====================================================================================================+" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                    PANTALLA 4: [COMPLETAR CON NARRATIVA]                                           |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|   [Agregar acertijo o pregunta final aqui]                                                         |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|                              1) Opcion 1                                                           |" << endl;
-              cout << "|                              2) Opcion 2                                                           |" << endl;
-              cout << "|                              3) Opcion 3                                                           |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "|   [Usar variable float tiempoRestante y operador && o ||]                                          |" << endl;
-              cout << "|                                                                                                    |" << endl;
-              cout << "+====================================================================================================+" << endl;
-              cout << endl;
-              cout << "  Ingrese Opcion: ";
-              cin >> eleccion;
-            } while (eleccion != 1 && eleccion != 2 && eleccion != 3);
-
-            // Ejemplo de uso de float y operador &&:
-            // if (eleccion == 3 && tiempoRestante > 0.0f) { victoria }
-            // else if (eleccion != 3 || tiempoRestante <= 0.0f) { derrota }
-
-            system("clear");
-            cout << "+====================================================================================================+" << endl;
-            cout << "|                                                                                                    |" << endl;
-            cout << "|                    [COMPLETAR: mensaje de correcto o incorrecto]                                    |" << endl;
-            cout << "|                                                                                                    |" << endl;
-            cout << "+====================================================================================================+" << endl;
-            cout << endl;
-            cout << "Presione ENTER para continuar...";
-            cin.ignore().get();
-            
-            // Por ahora siempre correcto para no bloquear
-            puntaje += 25;
-          }
-
-          pantallaActual++;
-        } // Fin while pantallas
-
-        // ==================================================================
-        //  PANTALLA FINAL: VICTORIA O DERROTA
-        // ==================================================================
-        if (sigueVivo)
-        {
-          // VICTORIA
-          system("clear");
-          cout << endl << endl;
-          cout << "   _______  _______  ___      ___  _______  _______  _______  __  " << endl;
-          cout << "  |       ||       ||   |    |   ||       ||       ||       ||  | " << endl;
-          cout << "  |  _____||   _   ||   |    |   ||  _____||_     _||    ___||  | " << endl;
-          cout << "  | |_____ |  |_|  ||   |    |   || |_____   |   |  |   |___ |  | " << endl;
-          cout << "  |_____  ||       ||   |___ |   ||_____  |  |   |  |    ___||__| " << endl;
-          cout << "   _____| ||   _   ||       ||   | _____| |  |   |  |   |___  __  " << endl;
-          cout << "  |_______||__| |__||_______||___||_______|  |___|  |_______||__| " << endl;
-          cout << endl;
-          
-          cout << "+====================================================================================================+" << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "|                    FELICITACIONES " << nombreJugador << "!" << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "|                    Escapaste del Laberinto de la Facultad!                                         |" << endl;
-          cout << "|                                                                                                    |" << endl;
-          
-          // Uso de variable float para calcular porcentaje
-          porcentaje = (puntaje / 100.0f) * 100.0f;
-          cout << "|                    Puntaje final: " << puntaje << "/100 (" << (int)porcentaje << "%)" << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "|                    Ahora, si... ponete a estudiar!                                                 |" << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "+====================================================================================================+" << endl;
-          cout << endl;
-          cout << "Presione ENTER para continuar...";
-          cin.ignore().get();
-        }
-        else
-        {
-          // DERROTA
-          system("clear");
-          cout << endl << endl;
-          cout << "   _______  __    _  _______  _______  ______   ______   _______  ______   __   __   __   __  " << endl;
-          cout << "  |       ||  |  | ||       ||       ||    _ | |    _ | |       ||      | |  | |  | |  | |  | " << endl;
-          cout << "  |    ___||   |_| ||       ||    ___||   | || |   | || |   _   ||  _    ||  |_|  | |  | |  | " << endl;
-          cout << "  |   |___ |       ||       ||   |___ |   |_||_|   |_||_|  |_|  || | |   ||       | |  | |  | " << endl;
-          cout << "  |    ___||  _    ||      _||    ___||    __  |    __  |       || |_|   ||       | |__| |__| " << endl;
-          cout << "  |   |___ | | |   ||     |_ |   |___ |   |  | |   |  | |   _   ||       ||   _   |  __   __  " << endl;
-          cout << "  |_______||_|  |__||_______||_______||___|  |_|___|  |_|__| |__||______| |__| |__| |__| |__| " << endl;
-          cout << endl;
-          
-          cout << "+====================================================================================================+" << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "|                    LO SIENTO " << nombreJugador << "..." << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "|                    No lograste escapar del Laberinto de la Facultad.                               |" << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "|                    Puntaje obtenido: " << puntaje << "/100" << endl;
-          cout << "|                                                                                                    |" << endl;
-          cout << "+====================================================================================================+" << endl;
-          cout << endl;
-          cout << "Presione ENTER para continuar...";
-          cin.ignore().get();
-        }
-
-        juegoActivo = false;
-      } // Fin if preparado
-
-      system("clear");
-      cout << "Game Over" << endl;
-      cout << "Presione ENTER para volver al menu...";
-      cin.ignore().get();
-    }
-    else if (opcionMenu == 4)
-    {
-      salirDelJuego = true;
-    }
-  } // Fin while menu principal
-
-  // ==========================================================================
-  //  SALIR
-  // ==========================================================================
-  system("clear");
-  cout << "Hasta la proxima!" << endl;
-  cout << endl;
-
+  endwin();
+  cout << "Gracias por jugar. Criaturas creadas en total: "
+       << Criatura::totalCriaturas << endl;
   return 0;
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void iniciarNcurses()
+{
+  initscr();
+  cbreak();
+  noecho();
+  keypad(stdscr, TRUE);
+  curs_set(0);
+  start_color();
+  init_pair(1, COLOR_WHITE,  COLOR_BLACK); // texto normal
+  init_pair(2, COLOR_GREEN,  COLOR_BLACK); // barras altas / estado bueno
+  init_pair(3, COLOR_YELLOW, COLOR_BLACK); // barras medias
+  init_pair(4, COLOR_RED,    COLOR_BLACK); // barras bajas / peligro
+  init_pair(5, COLOR_CYAN,   COLOR_BLACK); // criatura / acentos
+  init_pair(6, COLOR_MAGENTA,COLOR_BLACK); // título
+  calcularAdaptacion();
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+// Se adapta al tamaño real de la terminal: si es menor que el diseño,
+// se usa el tamaño de la terminal; si es mayor, se centra el diseño.
+void calcularAdaptacion()
+{
+  int alto, ancho;
+  getmaxyx(stdscr, alto, ancho);
+  W = min(ANCHO_DISENO, ancho);
+  H = min(ALTO_DISENO, alto);
+  if (W < ANCHO_MIN) W = min(ANCHO_MIN, ancho);
+  if (H < ALTO_MIN)  H = min(ALTO_MIN, alto);
+  ox = (ancho - W) / 2;
+  oy = (alto - H) / 2;
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+// Chequeo de consigna: ¿la terminal mide al menos 120x40?
+bool terminalSuficiente()
+{
+  int alto, ancho;
+  getmaxyx(stdscr, alto, ancho);
+  return (ancho >= ANCHO_DISENO && alto >= ALTO_DISENO);
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+// Si la terminal es mas chica que 120x40, se avisa con un mensaje
+// centrado y se espera a que el usuario redimensione (o salga con Q).
+void pedirTerminalGrande()
+{
+  while (!terminalSuficiente())
+  {
+    int alto, ancho;
+    getmaxyx(stdscr, alto, ancho);
+    clear();
+
+    // Marco de advertencia centrado (aunque la terminal sea chica).
+    int mw = min(ancho - 2, 70);
+    int mh = 9;
+    int mx = (ancho - mw) / 2;
+    int my = (alto - mh) / 2;
+    if (mx < 0) mx = 0;
+    if (my < 0) my = 0;
+
+    attron(COLOR_PAIR(4) | A_BOLD);
+    mvprintw(my, mx, "  TERMINAL DEMASIADO PEQUENA  ");
+    attroff(COLOR_PAIR(4) | A_BOLD);
+
+    attron(COLOR_PAIR(1));
+    mvprintw(my + 2, mx, "Este juego necesita una terminal de al menos:");
+    mvprintw(my + 3, mx, "    %d columnas x %d filas (resolucion del diseno)", ANCHO_DISENO, ALTO_DISENO);
+    mvprintw(my + 5, mx, "Tamano actual detectado: %d columnas x %d filas", ancho, alto);
+    mvprintw(my + 7, mx, ">> Redimensiona la ventana de la terminal <<");
+    attroff(COLOR_PAIR(1));
+
+    attron(COLOR_PAIR(3));
+    mvprintw(my + 8, mx, "[Q] Salir del juego   |   Cualquier otra tecla: reintentar");
+    attroff(COLOR_PAIR(3));
+
+    refresh();
+    int tecla = getch();
+    if (tecla == KEY_RESIZE) continue;
+    if (tecla == 'q' || tecla == 'Q')
+    {
+      endwin();
+      cout << "Terminal insuficiente (" << ancho << "x" << alto
+           << "). Se requiere al menos " << ANCHO_DISENO << "x"
+           << ALTO_DISENO << ". Saliendo..." << endl;
+      exit(0);
+    }
+  }
+  calcularAdaptacion();
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void dibujarMarco(int colorPar)
+{
+  attron(COLOR_PAIR(colorPar));
+  for (int x = 0; x < W; x++)
+  {
+    mvaddch(oy, ox + x, ACS_HLINE);
+    mvaddch(oy + H - 1, ox + x, ACS_HLINE);
+  }
+  for (int y = 0; y < H; y++)
+  {
+    mvaddch(oy + y, ox, ACS_VLINE);
+    mvaddch(oy + y, ox + W - 1, ACS_VLINE);
+  }
+  mvaddch(oy, ox, ACS_ULCORNER);
+  mvaddch(oy, ox + W - 1, ACS_URCORNER);
+  mvaddch(oy + H - 1, ox, ACS_LLCORNER);
+  mvaddch(oy + H - 1, ox + W - 1, ACS_LRCORNER);
+  attroff(COLOR_PAIR(colorPar));
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void barra(int y, int x, int valor, string etiqueta, int colorPar)
+{
+  attron(COLOR_PAIR(colorPar));
+  mvprintw(oy + y, ox + x, "%-9s [", etiqueta.c_str());
+  int lleno = valor / 5; // barra de 20 caracteres
+  for (int i = 0; i < 20; i++)
+    addch(i < lleno ? '#' : '-');
+  printw("] %3d", valor);
+  attroff(COLOR_PAIR(colorPar));
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+// Devuelve el color de la barra segun el nivel de UN atributo "a mayor
+// mejor" (energía, cordura). El hambre se maneja aparte porque es "a
+// mayor peor" (0 = saciada, 100 = muere de hambre).
+int colorNivel(int valor)
+{
+  if (valor > 60)      return 2; // verde: bien
+  else if (valor > 30) return 3; // amarillo: regular
+  else                 return 4; // rojo: peligro
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void mostrarTitulo()
+{
+    // Arte título
+    std::vector<std::string> arteTitulo = {
+        R"(   ____ _   _   _    ____  ____ ___    _    _   _   )",
+        R"(  / ___| | | | / \  |  _ \|  _ \_ _|  / \  | \ | |  )",
+        R"( | |  _| | |  / _ \ | |_) | | | | |  / _ \ |  \| |  )",
+        R"( | |_| | |_| / ___ \|  _ <| |_| | | / ___ \| |\  |  )",
+        R"(  \____|\___/_/   \_\_| \_\____/___/_/   \_\_| \_|  )"
+    };
+
+    // Centrar el arte del título (ancho: 55)
+    int cx = (W - 55) / 2;
+    if (cx < 1) cx = 1;
+
+    attron(COLOR_PAIR(6) | A_BOLD);
+    for (size_t i = 0; i < arteTitulo.size(); i++) {
+        mvprintw(oy + 2 + i, ox + cx, "%s", arteTitulo[i].c_str());
+    }
+    attroff(COLOR_PAIR(6) | A_BOLD);
+
+    attron(COLOR_PAIR(5));
+    // Centrar el subtítulo de forma independiente (ancho: 43)
+    int cxSub = (W - 43) / 2;
+    if (cxSub < 1) cxSub = 1;
+    mvprintw(oy + 8, ox + cxSub, "-- EL GUARDIAN DEL CEMENTERIO BRUTALISTA --");
+    attroff(COLOR_PAIR(5));
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+int menuPrincipal()
+{
+  int seleccion = JUGAR;
+  int tecla;
+
+  while (true)
+  {
+    // Si redimensionaron la terminal a menos de 120x40, avisar.
+    pedirTerminalGrande();
+    calcularAdaptacion(); // por si redimensionaron la terminal
+
+    clear();
+    dibujarMarco(5);
+    mostrarTitulo();
+
+    string opciones[NUM_OPCIONES] = { "1. JUGAR", "2. INSTRUCTIVO", "3. CREDITOS", "4. SALIR" };
+    int cx = W / 2 - 9;
+    if (cx < 1) cx = 1;
+
+    for (int i = 0; i < NUM_OPCIONES; i++)
+    {
+      if (i == seleccion)
+      {
+        attron(COLOR_PAIR(6) | A_REVERSE);
+        mvprintw(oy + 14 + i * 2, ox + cx, " %s ", opciones[i].c_str());
+        attroff(COLOR_PAIR(6) | A_REVERSE);
+      }
+      else
+      {
+        attron(COLOR_PAIR(1));
+        mvprintw(oy + 14 + i * 2, ox + cx, "  %s  ", opciones[i].c_str());
+        attroff(COLOR_PAIR(1));
+      }
+    }
+
+    attron(COLOR_PAIR(1));
+    mvprintw(oy + H - 5, ox + 2, "Flechas + ENTER. Tamano: %dx%d", W, H);
+    mvprintw(oy + H - 4, ox + 2, "Requisito mínimo de terminal: %dx%d", ANCHO_DISENO, ALTO_DISENO);
+    attroff(COLOR_PAIR(1));
+    refresh();
+
+    tecla = getch();
+    if (tecla == KEY_RESIZE) continue;
+    if (tecla == KEY_UP)   seleccion = (seleccion + NUM_OPCIONES - 1) % NUM_OPCIONES;
+    else if (tecla == KEY_DOWN) seleccion = (seleccion + 1) % NUM_OPCIONES;
+    else if (tecla == '\n' || tecla == KEY_ENTER) return seleccion;
+  }
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void mostrarInstructivo()
+{
+  clear();
+  dibujarMarco(5);
+  attron(COLOR_PAIR(6) | A_BOLD);
+  mvprintw(oy + 2, ox + W / 2 - 8, " INSTRUCTIVO ");
+  attroff(COLOR_PAIR(6) | A_BOLD);
+
+  attron(COLOR_PAIR(1));
+  mvprintw(oy + 5, ox + 4, "Eres el guardián de un cementerio brutalista. Una criatura antigua despierta");
+  mvprintw(oy + 6, ox + 4, "bajo el mausoleo de hormigón... y depende de tí para sobrevivir 15 noches.");
+  mvprintw(oy + 8, ox + 4, "ATRIBUTOS:");
+  mvprintw(oy + 9,  ox + 6, "- HAMBRE:  0 = saciada, 100 = muere de hambre. [A] ALIMENTAR la reduce.");
+  mvprintw(oy + 10, ox + 6, "- ENERGIA: si llega a 0, la criatura se apaga para siempre.");
+  mvprintw(oy + 11, ox + 6, "- CORDURA: si llega a 0, la criatura enloquece y se pierde.");
+  mvprintw(oy + 13, ox + 4, "ACCIONES (cada acción consume un ciclo de tiempo):");
+  mvprintw(oy + 14, ox + 6, "- [A] ALIMENTAR:       reduce el hambre de la criatura.");
+  mvprintw(oy + 15, ox + 6, "- [D] DESCANSAR:       recupera ENERGIA, sube un poco el hambre.");
+  mvprintw(oy + 16, ox + 6, "- [R] RITUAL CALMANTE: restaura la cordura con runas antiguas.");
+  mvprintw(oy + 17, ox + 6, "- [S] SIGUIENTE CICLO: deja pasar el tiempo sin hacer nada.");
+  mvprintw(oy + 18, ox + 6, "- [Q] ABANDONAR:       volver al menú principal.");
+  mvprintw(oy + 20, ox + 4, "CUIDADO: cada noche el cementerio sufre eventos aleatorios (vientos");
+  mvprintw(oy + 21, ox + 4, "fúnebres, cuervos ladrones, alarmas) que debilitan a la criatura.");
+  mvprintw(oy + 22, ox + 4, "El estado de ANIMO depende del atributo más bajo (el hambre se cuenta");
+  mvprintw(oy + 23, ox + 4, "como saciedad): TRANQUILO -> INQUIETO -> SOMBRIO -> FURIOSO.");
+  attroff(COLOR_PAIR(1));
+
+  pausar("Presiona cualquier tecla para volver al menú...");
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void mostrarCreditos()
+{
+    clear();
+    dibujarMarco(5);
+
+    attron(COLOR_PAIR(6) | A_BOLD);
+    mvprintw(oy + 2, ox + W / 2 - 5, " CREDITOS ");
+    attroff(COLOR_PAIR(6) | A_BOLD);
+
+    // Arte ASCII estilizado y alineado con raw string literals R"(...)"
+    attron(COLOR_PAIR(5));
+    mvprintw(oy + 7,  ox + W / 2 - 23, R"(  ____ ____  _____ ____ ___ _____ ___  ____  )");
+    mvprintw(oy + 8,  ox + W / 2 - 23, R"( / ___|  _ \| ____|  _ \_ _|_   _/ _ \/ ___| )");
+    mvprintw(oy + 9,  ox + W / 2 - 23, R"(| |   | |_) |  _| | | | | |  | || | | \___ \ )");
+    mvprintw(oy + 10, ox + W / 2 - 23, R"(| |___|  _ <| |___| |_| | |  | || |_| |___) |)");
+    mvprintw(oy + 11, ox + W / 2 - 23, R"( \____|_| \_\_____|____/___| |_| \___/|____/ )");
+    attroff(COLOR_PAIR(5));
+
+    attron(COLOR_PAIR(1));
+    mvprintw(oy + 15, ox + W / 2 - 8, "Juego creado por:");
+    attroff(COLOR_PAIR(1));
+
+    // Nombres centrados respecto al bloque de texto
+    attron(COLOR_PAIR(2) | A_BOLD);
+    mvprintw(oy + 17, ox + W / 2 - 9, "    Alan Verruá    ");
+    mvprintw(oy + 18, ox + W / 2 - 9, " Florencia Olivera ");
+    mvprintw(oy + 19, ox + W / 2 - 9, "Fiorella Carrettino");
+    attroff(COLOR_PAIR(2) | A_BOLD);
+
+   attron(COLOR_PAIR(3));
+    mvprintw(oy + 22, ox + W / 2 - 30, "Trabajo Práctico N.2 - Informática General (Cátedra Tirigall)");
+    mvprintw(oy + 23, ox + W / 2 - 19, "Universidad Nacional de las Artes (UNA)");
+    mvprintw(oy + 24, ox + W / 2 - 12, "Lic. Artes Multimediales.");
+    mvprintw(oy + 25, ox + W / 2 - 6, "Octubre 2026.");
+    attroff(COLOR_PAIR(3));
+
+    pausar("Presiona cualquier tecla para volver al menú...");
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void pausar(string mensaje)
+{
+  attron(COLOR_PAIR(3));
+  mvprintw(oy + H - 3, ox + 2, "%s", mensaje.c_str());
+  attroff(COLOR_PAIR(3));
+  refresh();
+  getch();
+}
+
+/* /////////////////////////////////////////////////////////////////////// */
+void jugar()
+{
+  clear();
+  dibujarMarco(5);
+
+  // Pedir el nombre de la criatura (uso del objeto STRING).
+  attron(COLOR_PAIR(5));
+  mvprintw(oy + 8, ox + 4, "La criatura despierta bajo el mausoleo...");
+  mvprintw(oy + 10, ox + 4, "Escribe su nombre (max. 20 letras) y pulsa ENTER: ");
+  attroff(COLOR_PAIR(5));
+  echo();
+  curs_set(1);
+  char buffer[21];
+  getnstr(buffer, 20);
+  noecho();
+  curs_set(0);
+  string nombre = (buffer[0] == '\0') ? "Hormigón" : string(buffer);
+
+  Criatura criatura(nombre);
+
+  const int CICLOS_PARA_GANAR = 15;
+  bool salirAlMenu = false;
+  string mensaje = "La criatura abre los ojos entre la niebla.";
+
+  while (!salirAlMenu)
+  {
+    // Chequeo por si redimensionaron la terminal durante la partida.
+    pedirTerminalGrande();
+    calcularAdaptacion(); // por si redimensionaron la terminal
+    clear();
+    dibujarMarco(5);
+
+    // Encabezado
+    attron(COLOR_PAIR(6) | A_BOLD);
+    mvprintw(oy + 2, ox + 2, " NOCHE %02d / %02d ", criatura.getEdad() + 1, CICLOS_PARA_GANAR);
+    attroff(COLOR_PAIR(6) | A_BOLD);
+    attron(COLOR_PAIR(5));
+    mvprintw(oy + 2, ox + 30, " Criatura: %-20s ", criatura.getNombre().c_str());
+    mvprintw(oy + 2, ox + 62, " ANIMO: %s ", criatura.getAnimoTexto().c_str());
+    attroff(COLOR_PAIR(5));
+
+    // Dibujar la criatura segun su estado de animo (arreglo + enum).
+    EstadoAnimo animo = criatura.getAnimo();
+    attron(COLOR_PAIR(5));
+    for (int i = 0; i < 7; i++)
+      mvprintw(oy + 5 + i, ox + 4, "%s", FRAMES_CRIATURA[animo][i].c_str());
+    attroff(COLOR_PAIR(5));
+
+    // Barras de atributos con colores segun nivel.
+    // HAMBRE: "a mayor peor" (100 = muere de hambre).
+    // ENERGIA y CORDURA: "a mayor mejor" (0 = muere).
+    int bx = 40;
+    int colorHambre  = criatura.getHambre()  > 60 ? 4 : (criatura.getHambre()  > 30 ? 3 : 2);
+    int colorEnergia = colorNivel(criatura.getEnergia());
+    int colorCordura = colorNivel(criatura.getCordura());
+    barra(6, bx, criatura.getHambre(),  "HAMBRE",  colorHambre);
+    barra(8, bx, criatura.getEnergia(), "ENERGÍA", colorEnergia);
+    barra(10, bx, criatura.getCordura(),"CORDURA", colorCordura);
+
+    // Mensaje del ultimo evento.
+    attron(COLOR_PAIR(1));
+    mvprintw(oy + 13, ox + bx, "Bitácora del guardia:");
+    mvprintw(oy + 14, ox + bx, "%s", mensaje.c_str());
+    attroff(COLOR_PAIR(1));
+
+    // Acciones disponibles.
+    attron(COLOR_PAIR(3));
+    mvprintw(oy + 17, ox + bx, "[A] Alimentar   [D] Descansar   [R] Ritual");
+    mvprintw(oy + 18, ox + bx, "[S] Siguiente ciclo             [Q] Salir al menú");
+    attroff(COLOR_PAIR(3));
+
+    refresh();
+    int tecla = getch();
+
+    if (tecla == KEY_RESIZE) continue;
+    if (tecla == 'q' || tecla == 'Q') { salirAlMenu = true; continue; }
+
+    if (tecla == 'a' || tecla == 'A')
+    {
+      criatura.alimentar();
+      criatura.pasarTiempo();
+      mensaje = "Ofrendas frescas para " + criatura.getNombre() + ".";
+    }
+    else if (tecla == 'd' || tecla == 'D')
+    {
+      criatura.descansar();
+      criatura.pasarTiempo();
+      mensaje = criatura.getNombre() + " duerme entre ecos fríos.";
+    }
+    else if (tecla == 'r' || tecla == 'R')
+    {
+      criatura.ritualCalmante();
+      criatura.pasarTiempo();
+      mensaje = "Runas antiguas calman la mente de " + criatura.getNombre() + ".";
+    }
+    else
+    {
+      criatura.pasarTiempo();
+      mensaje = "El tiempo pesa sobre los muros de hormigón...";
+    }
+
+    // Verificar derrota: la criatura muere.
+    if (!criatura.estaViva())
+    {
+      clear();
+      dibujarMarco(4);
+
+      // "DERROTA"
+      std::vector<std::string> arteDerrota = {
+          R"(  ____  ____  ____  ____  ___  _____    __    )",
+          R"( |  _ \|  __||  _ \|  _ \/ _ \|_   _|  /  \   )",
+          R"( | | | | |__ | |_) | |_) | | | |  | | / /\ \  )",
+          R"( | |_| |  __||  _ <|  _ <| |_| |  | |/ /__\ \ )",
+          R"( |____/|____||_| \_\_| \_\\___/   |_/_/    \_\)"
+      };
+
+      attron(COLOR_PAIR(4) | A_BOLD);
+      for (size_t i = 0; i < arteDerrota.size(); i++) {
+          // Restamos 22 (mitad de 44) para centrar exacto
+          mvprintw(oy + 8 + i, ox + W / 2 - 22, "%s", arteDerrota[i].c_str());
+      }
+      attroff(COLOR_PAIR(4) | A_BOLD);
+
+      attron(COLOR_PAIR(1));
+      mvprintw(oy + 15, ox + 4, "%s ha vuelto al silencio del cementerio brutalista...", criatura.getNombre().c_str());
+      attroff(COLOR_PAIR(1));
+
+      pausar("Presiona cualquier tecla para volver al menú principal.");
+      salirAlMenu = true;
+    }
+    // Verificar victoria: sobrevivio los 15 ciclos.
+    else if (criatura.getEdad() >= CICLOS_PARA_GANAR)
+    {
+      clear();
+      dibujarMarco(2);
+
+      // "VICTORIA"
+      std::vector<std::string> arteVictoria = {
+          R"( __     __ ___   ____  _____  ___  ____   ___      _    )",
+          R"( \ \   / /|_ _| / ___||_   _|/ _ \|  _ \ |_ _|    / \   )",
+          R"(  \ \ / /  | | | |      | | | | | | |_) | | |    / _ \  )",
+          R"(   \ V /   | | | |___   | | | |_| |  _ <  | |   / ___ \ )",
+          R"(    \_/   |___| \____|  |_|  \___/|_| \_\|___| /_/   \_\)"
+      };
+
+      attron(COLOR_PAIR(2) | A_BOLD);
+      for (size_t i = 0; i < arteVictoria.size(); i++) {
+          // Restamos 27 (mitad de 54) para centrar exacto
+          mvprintw(oy + 8 + i, ox + W / 2 - 27, "%s", arteVictoria[i].c_str());
+      }
+      attroff(COLOR_PAIR(2) | A_BOLD);
+
+      attron(COLOR_PAIR(1));
+      mvprintw(oy + 15, ox + 4, "%s sobrevivió las %d noches. El mausoleo sigue en pie.", criatura.getNombre().c_str(), CICLOS_PARA_GANAR);
+      attroff(COLOR_PAIR(1));
+
+      pausar("Presiona cualquier tecla para volver al menú principal.");
+      salirAlMenu = true;
+    }
+  }
 }
